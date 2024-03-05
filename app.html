@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Application</title>
+    <style>
+        .chat-container {
+            max-width: 400px;
+            margin: 0 auto;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .chat-history {
+            height: 200px;
+            overflow-y: scroll;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-history" id="chat-history"></div>
+        <div>
+            <select id="llm-models">
+                <option value="model1">Model 1</option>
+                <option value="model2">Model 2</option>
+                <!-- Add more models as needed -->
+            </select>
+        </div>
+        <div>
+            <textarea id="question" placeholder="Enter your question"></textarea>
+        </div>
+        <div>
+            <textarea id="answer" placeholder="Answer will appear here" readonly></textarea>
+        </div>
+    </div>
+
+    <script>
+        // Sample chat history data (you can replace this with actual chat history from the backend)
+        const chatHistoryData = [
+            { user: 'User', message: 'Hello, how can I help you?' },
+            { user: 'Bot', message: 'Welcome! Please ask your question.' }
+        ];
+
+        // Function to display chat history
+        function displayChatHistory() {
+            const chatHistoryDiv = document.getElementById('chat-history');
+            chatHistoryData.forEach(item => {
+                const messageDiv = document.createElement('div');
+                messageDiv.textContent = `${item.user}: ${item.message}`;
+                chatHistoryDiv.appendChild(messageDiv);
+            });
+        }
+
+        // Function to handle model selection and question submission
+        function handleQuestionSubmission() {
+            const selectedModel = document.getElementById('llm-models').value;
+            const question = document.getElementById('question').value;
+
+            // Perform API call to backend with selectedModel and question
+            // Receive the answer from the backend API
+
+            // For now, let's assume the answer is received as 'sample answer'
+            const answer = 'Sample answer from the backend API';
+
+            // Display the answer
+            document.getElementById('answer').value = answer;
+
+            // Update chat history
+            chatHistoryData.push({ user: 'User', message: question });
+            chatHistoryData.push({ user: 'Bot', message: answer });
+            displayChatHistory();
+        }
+
+        // Sample backend event trigger (for demonstration purposes)
+        function triggerNotification() {
+            // Simulate a backend event triggering a notification
+            alert('New notification from the backend!');
+        }
+
+        // Sample interval for triggering notifications (for demonstration purposes)
+        setInterval(triggerNotification, 5000); // Trigger notification every 5 seconds
+
+        // Display chat history when the page loads
+        displayChatHistory();
+    </script>
+</body>
+</html>

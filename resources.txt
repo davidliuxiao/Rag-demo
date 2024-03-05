@@ -1,0 +1,14 @@
+Js notification
+https://github.com/vadimkorr/module-notification
+Web Crawler
+https://console.apify.com/
+
+
+https://blog.streamlit.io/chat-with-pandas-dataframes-using-llms/
+
+https://blog.streamlit.io/exploring-llms-and-prompts-a-guide-to-the-prompttools-playground/
+#langfuse & langsmith
+https://medium.com/@tzam/actionable-tips-tricks-when-working-with-llms-323bf8b8db33
+
+How can we remove embeddings by selection ?
+https://medium.com/@coding-otter/reduce-your-transformers-model-size-by-removing-unwanted-tokens-and-word-embeddings-eec08166d2f9
