@@ -1,4 +1,4 @@
-import os, tempfile
+import os
 import pinecone
 from pathlib import Path
 
@@ -7,25 +7,19 @@ import PyPDF2
 from langchain.chains import RetrievalQA, ConversationalRetrievalChain
 from langchain.embeddings import OpenAIEmbeddings
 import chromadb
-from langchain import OpenAI
-from langchain.llms.openai import OpenAIChat
 from langchain.chat_models import ChatOpenAI
 from langchain.document_loaders import DirectoryLoader
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.vectorstores import Chroma, Pinecone
 from langchain.embeddings.openai import OpenAIEmbeddings
-from langchain.memory import ConversationBufferMemory
-from langchain.memory.chat_message_histories import StreamlitChatMessageHistory
 
-from langchain_core.prompts.prompt import PromptTemplate
 
 from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
-# from langchain_core.output_parsers import StrOutputParser
 
 import streamlit as st
 from streamlit_js_eval import streamlit_js_eval
-# import shutil
+
+import time
 
 #SeleniumURLLoader
 from langchain.document_loaders import SeleniumURLLoader
@@ -61,6 +55,9 @@ def clean_documents():
     # shutil.rmtree(LOCAL_VECTOR_STORE_DIR.as_posix())
     # vectordb = chromadb.PersistentClient(path=LOCAL_VECTOR_STORE_DIR.as_posix(), settings=chromadb.config.Settings(anonymized_telemetry=False, allow_reset=True))
     # vectordb.reset()
+    with st.spinner(text='In progress'):
+        time.sleep(3)
+        st.success('Done')
     st.session_state.client.reset()
     st.session_state.retriever = None
     st.session_state.source_docs = None
@@ -88,13 +85,13 @@ def embeddings_on_local_vectordb(texts):
     retriever = vectordb.as_retriever(search_kwargs={'k': 6})
     return retriever
 
-def embeddings_on_pinecone(texts):
-    print("pinecone")
-    pinecone.init(api_key=st.session_state.pinecone_api_key, environment=st.session_state.pinecone_env)
-    embeddings = OpenAIEmbeddings(openai_api_key=st.session_state.openai_api_key)
-    vectordb = Pinecone.from_documents(texts, embeddings, index_name=st.session_state.pinecone_index)
-    retriever = vectordb.as_retriever()
-    return retriever
+# def embeddings_on_pinecone(texts):
+#     print("pinecone")
+#     pinecone.init(api_key=st.session_state.pinecone_api_key, environment=st.session_state.pinecone_env)
+#     embeddings = OpenAIEmbeddings(openai_api_key=st.session_state.openai_api_key)
+#     vectordb = Pinecone.from_documents(texts, embeddings, index_name=st.session_state.pinecone_index)
+#     retriever = vectordb.as_retriever()
+#     return retriever
 
 def query_llm(retriever, query):
     # PROMPT = PromptTemplate.from_template(_template)
@@ -116,30 +113,30 @@ def query_llm(retriever, query):
 def input_fields():
     print("start init")
     #
-    with st.sidebar:
-        #
-        if "openai_api_key" in st.secrets:
-            st.session_state.openai_api_key = st.secrets.openai_api_key
-        else:
-            st.session_state.openai_api_key = st.text_input("OpenAI API key", type="password")
-        #
-        if "pinecone_api_key" in st.secrets:
-            st.session_state.pinecone_api_key = st.secrets.pinecone_api_key
-        else: 
-            st.session_state.pinecone_api_key = st.text_input("Pinecone API key", type="password")
-        #
-        if "pinecone_env" in st.secrets:
-            st.session_state.pinecone_env = st.secrets.pinecone_env
-        else:
-            st.session_state.pinecone_env = st.text_input("Pinecone environment")
-        #
-        if "pinecone_index" in st.secrets:
-            st.session_state.pinecone_index = st.secrets.pinecone_index
-        else:
-            st.session_state.pinecone_index = st.text_input("Pinecone index name")
+    # with st.sidebar:
+    #     #
+    #     if "openai_api_key" in st.secrets:
+    #         st.session_state.openai_api_key = st.secrets.openai_api_key
+    #     else:
+    #         st.session_state.openai_api_key = st.text_input("OpenAI API key", type="password")
+    #     #
+    #     if "pinecone_api_key" in st.secrets:
+    #         st.session_state.pinecone_api_key = st.secrets.pinecone_api_key
+    #     else:
+    #         st.session_state.pinecone_api_key = st.text_input("Pinecone API key", type="password")
+    #     #
+    #     if "pinecone_env" in st.secrets:
+    #         st.session_state.pinecone_env = st.secrets.pinecone_env
+    #     else:
+    #         st.session_state.pinecone_env = st.text_input("Pinecone environment")
+    #     #
+    #     if "pinecone_index" in st.secrets:
+    #         st.session_state.pinecone_index = st.secrets.pinecone_index
+    #     else:
+    #         st.session_state.pinecone_index = st.text_input("Pinecone index name")
     #
     # print("finish init")
-    st.session_state.pinecone_db = st.toggle('Use Pinecone Vector DB')
+    # st.session_state.pinecone_db = st.toggle('Use Pinecone Vector DB')
     st.button("Reset knowledge", on_click=clean_documents)
     # print("use pinecone: " +str(st.session_state.pinecone_db))
     #
@@ -183,7 +180,7 @@ def process_links():
                 st.session_state.retriever = embeddings_on_local_vectordb(texts)
             else:
                 st.info(f"storing in pinecone")
-                st.session_state.retriever = embeddings_on_pinecone(texts)
+                # st.session_state.retriever = embeddings_on_pinecone(texts)
     except Exception as e:
         print("error: " + str(e))
         st.error(f"An error occurred: {e}")
@@ -231,7 +228,7 @@ def process_documents():
                 st.session_state.retriever = embeddings_on_local_vectordb(split_docs)
             else:
                 st.info(f"storing in pinecone")
-                st.session_state.retriever = embeddings_on_pinecone(texts)
+                # st.session_state.retriever = embeddings_on_pinecone(texts)
 
 
             # for content, metadata in content_metadata_list:
