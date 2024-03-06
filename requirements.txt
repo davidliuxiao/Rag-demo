@@ -1,4 +1,6 @@
 langchain
+langchain_openai
+langchain_core
 pinecone_client==2.2.2
 openai
 selenium
@@ -11,10 +13,10 @@ playwright
 beautifulsoup4
 transformers
 sentence_transformers
-faiss-cpu
-torch
 streamlit
-Flask
 tiktoken
 PyPDF2
 pysqlite3
+streamlit-js-eval
+sentence-transformers
+langsmith
