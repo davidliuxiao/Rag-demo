@@ -32,9 +32,6 @@ import time
 #SeleniumURLLoader
 from langchain.document_loaders import SeleniumURLLoader
 
-#validate results
-# from sentence_transformers import SentenceTransformer, util
-
 
 from langchain.retrievers import ContextualCompressionRetriever
 from langchain.retrievers.document_compressors import LLMChainExtractor
@@ -47,20 +44,19 @@ os.environ["LANGCHAIN_TRACING_V2"] = 'true'
 os.environ["LANGCHAIN_API_KEY"] = 'ls__3c556b0468344b198cc40b30da61f447'
 os.environ["ALLOW_RESET"] = 'TRUE'
 
-TMP_DIR = Path(__file__).resolve().parent.joinpath('data', 'tmp')
 LOCAL_VECTOR_STORE_DIR = Path(__file__).resolve().parent.joinpath('data', 'vector_store')
 
 
 
-st.set_page_config(page_title="RAG Demo")
+st.set_page_config(page_title="BIS ChatBot")
 
 with open("./static/style.css") as f:
     st.markdown('<style>{}</style>'.format(f.read()), unsafe_allow_html=True)
 
-
+PDF_DIR = Path(__file__).resolve().parent.joinpath('data', 'pdfs')
 
 def load_documents():
-    loader = DirectoryLoader(TMP_DIR.as_posix(), glob='**/*.pdf')
+    loader = DirectoryLoader(PDF_DIR.as_posix(), glob='**/*.pdf')
     documents = loader.load()
     return documents
 
@@ -74,11 +70,12 @@ def clean_documents():
     st.session_state.client.reset()
     st.session_state.retriever = None
     st.session_state.source_docs = None
+    # TODO delete all pdfs
     streamlit_js_eval(js_expressions="parent.window.location.reload()")
     return
 
 def split_documents(documents):
-    text_splitter = CharacterTextSplitter(chunk_size=2000, chunk_overlap=0)
+    text_splitter = CharacterTextSplitter(chunk_size=st.session_state.chunk_size, chunk_overlap=st.session_state.chunk_overlap)
     texts = text_splitter.split_documents(documents)
     return texts
 
@@ -94,7 +91,7 @@ def split_links(url, title):
     cleaned_url = url.strip("b'").strip('"')
     loader = SeleniumURLLoader(urls=[cleaned_url])
     documents = loader.load()
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=0)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=st.session_state.chunk_size, chunk_overlap=st.session_state.chunk_overlap)
     all_splits = text_splitter.split_documents(documents)
     return all_splits
 def embeddings_on_local_vectordb(texts):
@@ -133,19 +130,8 @@ def query_llm(retriever, query):
 
 def input_fields():
     print("start init")
-    with st.sidebar:
-        st.session_state.llm_model = st.selectbox('Model', ['gpt-3.5-turbo-0125','gpt-4-0125-preview'])
-        st.container(height=100, border=False)
-        st.session_state.docs_similarity = st.slider("documents similarity", float(0.0), float(1.0))
-        st.container(height=100, border=False)
-        st.button("Reset knowledge", on_click=clean_documents)
-        #
-        if "openai_api_key" in st.secrets:
-            st.session_state.openai_api_key = st.secrets.openai_api_key
-        else:
-            st.session_state.openai_api_key = st.text_input("OpenAI API key", type="password")
+    init_sidebar()
 
-    #
     col1, col2 = st.columns(2)
 
     with col1:
@@ -156,20 +142,40 @@ def input_fields():
         st.button("Learn urls", on_click=process_links)
 
 
+def init_sidebar():
+    with st.sidebar:
+        st.session_state.llm_model = st.selectbox('Model', ['gpt-3.5-turbo-0125', 'gpt-4-0125-preview'])
+        st.container(height=100, border=False)
+        st.session_state.docs_similarity = st.slider("Documents Relevance", float(0.0), float(1.0), help='Relevance level for source inclusion')
+
+        st.container(height=100, border=False)
+        st.session_state.chunk_size = 2000
+        st.session_state.chunk_size = st.slider("Chunk Size", 100, 100000, 2000, help='Unit of information provide to context')
+        st.session_state.chunk_overlap = 50
+        st.session_state.chunk_overlap = st.slider("Chunk Size", 0, 2000, 100, help='Unit of information provide to context')
+        st.container(height=100, border=False)
+        st.button("Reset knowledge", on_click=clean_documents)
+        #
+        if "openai_api_key" in st.secrets:
+            st.session_state.openai_api_key = st.secrets.openai_api_key
+        else:
+            st.session_state.openai_api_key = st.text_input("OpenAI API key", type="password")
+
 
 def init_states():
 
-    st.session_state.client = chromadb.PersistentClient(path=LOCAL_VECTOR_STORE_DIR.as_posix())
-    st.session_state.text_splitter = RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=0)
-
     st.session_state.links = {}
     st.session_state.source_docs = {}
+    st.session_state.client = chromadb.PersistentClient(path=LOCAL_VECTOR_STORE_DIR.as_posix())
+    # st.session_state.retriever = None
 
 def process_links():
     if not st.session_state.openai_api_key or not st.session_state.links:
         st.warning(f"Please upload the urls and provide the missing fields in the side-bar")
     else:
         try:
+            st.session_state.text_splitter = RecursiveCharacterTextSplitter(chunk_size=st.session_state.chunk_size,
+                                                                            chunk_overlap=st.session_state.chunk_overlap)
             properties = {}
             for line in st.session_state.links:
                 #
@@ -196,24 +202,38 @@ def prepare_doc(pdf_docs):
         print(pdf.name)
         pdf_reader = PyPDF2.PdfReader(pdf)
         for index, text in enumerate(pdf_reader.pages):
-            doc_page = {'title': pdf.name + " page " + str(index + 1),
+            doc_page = {'title': pdf.name,
+                        'page' : str(index + 1),
                         'content': pdf_reader.pages[index].extract_text()}
             docs.append(doc_page)
     for doc in docs:
-        st.toast(f"Learning: " + doc["title"])
+        st.toast(f"Learning: " + doc["title"] + ': page '+ doc["page"])
         # content_metadata_list.append((doc["content"], {"title": doc["title"]}))
         content.append(doc["content"])
         metadata.append({
-            "title": doc["title"]
+            "title": doc["title"],
+            "page": doc["page"],
+            "type" :"pdf"
         })
     return content, metadata
+
+
+def save_pdf(source_docs):
+    for source_doc in source_docs:
+        with open(os.path.join(PDF_DIR.as_posix(), source_doc.name), "wb") as f:
+            f.write(source_doc.getbuffer())
+        print("Saved File: " + source_doc.name)
+
 
 def process_documents():
     if not st.session_state.openai_api_key or not st.session_state.source_docs:
         st.warning(f"Please upload the documents and provide the missing fields in the side-bar")
     else:
         try:
+            st.session_state.text_splitter = RecursiveCharacterTextSplitter(chunk_size=st.session_state.chunk_size,
+                                                                            chunk_overlap=st.session_state.chunk_overlap)
             print("start load docs: ")
+            save_pdf(st.session_state.source_docs)
             content, metadata = prepare_doc(st.session_state.source_docs)
             split_docs = get_text_chunks(content, metadata)
             st.session_state.retriever = embeddings_on_local_vectordb(split_docs)
@@ -246,9 +266,16 @@ def response_generator(response):
 def format_source_doc(source_docs):
     source_docs_formatted = []
     for doc in source_docs:
-        title = doc.metadata.get("title")
-        detail = doc.page_content
-        doc_formatted = {'title': title, 'detail': detail}
+        if doc.metadata.get("page") is not None and int(doc.metadata.get("page")) > 0:
+            title =  doc.metadata.get("title") + ' page '+doc.metadata.get("page")
+            source = os.path.join(PDF_DIR.as_posix(), doc.metadata.get("title"))
+            detail = doc.page_content
+            doc_formatted = {'title': title,'source': source, 'detail': detail}
+        else:
+            title =  doc.metadata.get("title")
+            source = doc.metadata.get("source")
+            detail = doc.page_content
+            doc_formatted = {'title': title,'source': source, 'detail': detail}
         source_docs_formatted.append(doc_formatted)
     return source_docs_formatted
 
@@ -266,34 +293,37 @@ def boot():
         st.session_state.messages = []
     #
     for message in st.session_state.messages:
-        st.chat_message('human').write(message[0])
-        st.chat_message('ai').write(message[1])    
+        st.chat_message('human', avatar='./static/user.png').write(message[0])
+        st.chat_message('ai', avatar='./static/genai_red.png').write(message[1])
     #
     if query := st.chat_input(placeholder='Message BISGPT...'):
-        st.chat_message("human").write(query)
-        response = query_llm(st.session_state.retriever, query)
+        st.chat_message("human", avatar='./static/user.png').write(query)
+        if "retriever" not in st.session_state:
+            st.warning("Please upload the documents or urls first")
+        else:
+            response = query_llm(st.session_state.retriever, query)
 
-        # Post-processing step to validate the answer against the source documents
-        if response['source_documents']:
-            response_answer = response['answer']
-            source_docs = response['source_documents']
-        # is_valid_answer = validate_answer_against_sources(response_answer, source_docs)
-        source_docs_formatted =format_source_doc(response['source_documents'])
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            # st.chat_message("ai").write(response['answer'])
-            st.chat_message("ai").write_stream(response_generator(response['answer']))
-        with col2:
-            # st.chat_message("code").write(response['source_documents'])
-            with st.chat_message("source_documents"):
-                for doc in source_docs_formatted:
-                    st.markdown(doc['title'], help=doc['detail'])
-            # if is_valid_answer:
-            #     with col2:
-            #         st.chat_message("code").write(response['source_documents'])
+            # Post-processing step to validate the answer against the source documents
+            if response['source_documents']:
+                response_answer = response['answer']
+                source_docs = response['source_documents']
+            # is_valid_answer = validate_answer_against_sources(response_answer, source_docs)
+            source_docs_formatted =format_source_doc(response['source_documents'])
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                # st.chat_message("ai").write(response['answer'])
+                st.chat_message("ai", avatar='./static/genai_red.png').write_stream(response_generator(response['answer']))
+            with col2:
+                with st.chat_message("source_documents"):
+                    for doc in source_docs_formatted:
+                        title = doc['title']
+                        url = doc['source']
+                        link = f'[{title}]({url})'
+                        st.markdown(link, help=doc['detail'])
 
 
-#TODO add validation of source ref
+
+
 if __name__ == '__main__':
     #
     boot()
