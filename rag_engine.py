@@ -89,7 +89,7 @@ def split_links(url, title):
     return all_splits
 def embeddings_on_local_vectordb(texts):
     print("local")
-    vectordb = Chroma.from_documents(texts, embedding=OpenAIEmbeddings(), client=st.session_state.client,
+    vectordb = Chroma.from_documents(texts, embedding=OpenAIEmbeddings(openai_api_key=st.session_state.openai_api_key), client=st.session_state.client,
                                      persist_directory=LOCAL_VECTOR_STORE_DIR.as_posix())
     vectordb.persist()
     retriever = vectordb.as_retriever(search_kwargs={'k': 6})
