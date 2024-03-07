@@ -36,6 +36,7 @@ from langchain.document_loaders import SeleniumURLLoader
 
 os.environ["LANGCHAIN_TRACING_V2"] = 'true'
 os.environ["LANGCHAIN_API_KEY"] = 'ls__3c556b0468344b198cc40b30da61f447'
+os.environ["ALLOW_RESET"] = 'TRUE'
 
 TMP_DIR = Path(__file__).resolve().parent.joinpath('data', 'tmp')
 LOCAL_VECTOR_STORE_DIR = Path(__file__).resolve().parent.joinpath('data', 'vector_store')
@@ -164,10 +165,7 @@ def input_fields():
 
 
     # init Chroma DB TODO do we need pinecone ?
-    st.session_state.client = chromadb.PersistentClient(path=LOCAL_VECTOR_STORE_DIR.as_posix(),
-                                                        settings=chromadb.config.Settings(
-                                                            anonymized_telemetry=False,
-                                                            allow_reset=True))
+    st.session_state.client = chromadb.PersistentClient(path=LOCAL_VECTOR_STORE_DIR.as_posix())
     # if hasattr(st.session_state, 'source_docs'):
     #     print("docs are1: " + str(st.session_state.source_docs))
     #
