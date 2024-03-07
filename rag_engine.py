@@ -5,6 +5,11 @@ import PyPDF2
 
 from langchain.chains import RetrievalQA, ConversationalRetrievalChain
 from langchain.embeddings import OpenAIEmbeddings
+
+__import__('pysqlite3')
+import sys
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+
 import chromadb
 from langchain.chat_models import ChatOpenAI
 from langchain.document_loaders import DirectoryLoader
@@ -18,8 +23,7 @@ from langchain_openai import ChatOpenAI
 import streamlit as st
 from streamlit_js_eval import streamlit_js_eval
 
-__import__('pysqlite3')
-import sys
+
 
 import time
 
