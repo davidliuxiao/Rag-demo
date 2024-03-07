@@ -19,6 +19,9 @@ from langchain_openai import ChatOpenAI
 import streamlit as st
 from streamlit_js_eval import streamlit_js_eval
 
+__import__('pysqlite3')
+import sys
+
 import time
 
 #SeleniumURLLoader
@@ -34,7 +37,7 @@ os.environ["LANGCHAIN_API_KEY"] = 'ls__3c556b0468344b198cc40b30da61f447'
 TMP_DIR = Path(__file__).resolve().parent.joinpath('data', 'tmp')
 LOCAL_VECTOR_STORE_DIR = Path(__file__).resolve().parent.joinpath('data', 'vector_store')
 
-
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 st.set_page_config(page_title="RAG Demo")
 
