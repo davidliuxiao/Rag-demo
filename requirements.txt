@@ -14,7 +14,6 @@ sentence_transformers
 streamlit
 tiktoken
 PyPDF2
-pysqlite3
 streamlit-js-eval
 sentence-transformers
 langsmith
