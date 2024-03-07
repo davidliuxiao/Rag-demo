@@ -1,0 +1,19 @@
+div[data-testid="stSidebarContent"] {
+    background-color: #aa322f;
+}
+
+
+div[data-testid="stImage"] {
+    text-align: center;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+}
+
+div[data-testid="StyledLinkIconContainer"] {
+    text-align: center;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
