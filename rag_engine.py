@@ -6,9 +6,11 @@ import PyPDF2
 from langchain.chains import RetrievalQA, ConversationalRetrievalChain
 from langchain.embeddings import OpenAIEmbeddings
 
-
+#TODO uncomment before deploying, to overcome streamlit bug
 import sys
 sys.modules['sqlite3'] = __import__('pysqlite3')
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+
 
 import chromadb
 from langchain.chat_models import ChatOpenAI
@@ -34,6 +36,13 @@ from langchain.document_loaders import SeleniumURLLoader
 # from sentence_transformers import SentenceTransformer, util
 
 
+from langchain.retrievers import ContextualCompressionRetriever
+from langchain.retrievers.document_compressors import LLMChainExtractor
+from langchain.retrievers.document_compressors import DocumentCompressorPipeline
+from langchain_community.document_transformers import EmbeddingsRedundantFilter
+from langchain.retrievers.document_compressors import EmbeddingsFilter
+
+
 os.environ["LANGCHAIN_TRACING_V2"] = 'true'
 os.environ["LANGCHAIN_API_KEY"] = 'ls__3c556b0468344b198cc40b30da61f447'
 os.environ["ALLOW_RESET"] = 'TRUE'
@@ -41,7 +50,7 @@ os.environ["ALLOW_RESET"] = 'TRUE'
 TMP_DIR = Path(__file__).resolve().parent.joinpath('data', 'tmp')
 LOCAL_VECTOR_STORE_DIR = Path(__file__).resolve().parent.joinpath('data', 'vector_store')
 
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+
 
 st.set_page_config(page_title="RAG Demo")
 
@@ -49,17 +58,11 @@ with open("./static/style.css") as f:
     st.markdown('<style>{}</style>'.format(f.read()), unsafe_allow_html=True)
 
 
-#TODO clean code
-# output_parser = StrOutputParser()
 
 def load_documents():
     loader = DirectoryLoader(TMP_DIR.as_posix(), glob='**/*.pdf')
     documents = loader.load()
     return documents
-# def load_documents():
-#     loader = DirectoryLoader(TMP_DIR.as_posix(), glob='**/*.pdf')
-#     documents = loader.load()
-#     return documents
 
 def clean_documents():
     # shutil.rmtree(LOCAL_VECTOR_STORE_DIR.as_posix())
@@ -75,41 +78,49 @@ def clean_documents():
     return
 
 def split_documents(documents):
-    text_splitter = CharacterTextSplitter(chunk_size=2000, chunk_overlap=50)
+    text_splitter = CharacterTextSplitter(chunk_size=2000, chunk_overlap=0)
     texts = text_splitter.split_documents(documents)
     return texts
+
+
+def get_text_chunks(content, metadata):
+    text_splitter = st.session_state.text_splitter
+    split_docs = text_splitter.create_documents(content, metadatas=metadata)
+    print(f"Documents are split into {len(split_docs)} passages")
+    return split_docs
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 def split_links(url, title):
     cleaned_url = url.strip("b'").strip('"')
     loader = SeleniumURLLoader(urls=[cleaned_url])
     documents = loader.load()
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=50)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=0)
     all_splits = text_splitter.split_documents(documents)
     return all_splits
 def embeddings_on_local_vectordb(texts):
     print("local")
-    vectordb = Chroma.from_documents(texts, embedding=OpenAIEmbeddings(openai_api_key=st.session_state.openai_api_key), client=st.session_state.client,
+    embeddings = OpenAIEmbeddings(openai_api_key=st.session_state.openai_api_key)
+    vectordb = Chroma.from_documents(texts, embedding=embeddings, client=st.session_state.client,
                                      persist_directory=LOCAL_VECTOR_STORE_DIR.as_posix())
     vectordb.persist()
-    retriever = vectordb.as_retriever(search_kwargs={'k': 6})
-    return retriever
+    retriever = vectordb.as_retriever()
+    splitter = st.session_state.text_splitter
+    redundant_filter = EmbeddingsRedundantFilter(embeddings=embeddings)
+    relevant_filter = EmbeddingsFilter(embeddings=embeddings, similarity_threshold=st.session_state.docs_similarity)
+    pipeline_compressor = DocumentCompressorPipeline(
+        transformers=[splitter, redundant_filter, relevant_filter]
+    )
+    compression_retriever = ContextualCompressionRetriever(
+        base_compressor=pipeline_compressor, base_retriever=retriever
+    )
 
-# def embeddings_on_pinecone(texts):
-#     print("pinecone")
-#     pinecone.init(api_key=st.session_state.pinecone_api_key, environment=st.session_state.pinecone_env)
-#     embeddings = OpenAIEmbeddings(openai_api_key=st.session_state.openai_api_key)
-#     vectordb = Pinecone.from_documents(texts, embeddings, index_name=st.session_state.pinecone_index)
-#     retriever = vectordb.as_retriever()
-#     return retriever
+    return compression_retriever
+
 
 def query_llm(retriever, query):
-    # PROMPT = PromptTemplate.from_template(_template)
 
     qa_chain = ConversationalRetrievalChain.from_llm(
-        # llm=OpenAIChat(openai_api_key=st.session_state.openai_api_key),
         llm=ChatOpenAI(model_name=st.session_state.llm_model, openai_api_key=st.session_state.openai_api_key),
-        # llm=OpenAI(model_name="gpt-3.5-turbo-16k"),
         # condense_question_prompt = PROMPT,
         retriever=retriever,
         return_source_documents=True,
@@ -125,50 +136,28 @@ def input_fields():
     with st.sidebar:
         st.session_state.llm_model = st.selectbox('Model', ['gpt-3.5-turbo-0125','gpt-4-0125-preview'])
         st.container(height=100, border=False)
+        st.session_state.docs_similarity = st.slider("documents similarity", float(0.0), float(1.0))
+        st.container(height=100, border=False)
         st.button("Reset knowledge", on_click=clean_documents)
         #
         if "openai_api_key" in st.secrets:
             st.session_state.openai_api_key = st.secrets.openai_api_key
         else:
             st.session_state.openai_api_key = st.text_input("OpenAI API key", type="password")
-    #     #
-    #     if "pinecone_api_key" in st.secrets:
-    #         st.session_state.pinecone_api_key = st.secrets.pinecone_api_key
-    #     else:
-    #         st.session_state.pinecone_api_key = st.text_input("Pinecone API key", type="password")
-    #     #
-    #     if "pinecone_env" in st.secrets:
-    #         st.session_state.pinecone_env = st.secrets.pinecone_env
-    #     else:
-    #         st.session_state.pinecone_env = st.text_input("Pinecone environment")
-    #     #
-    #     if "pinecone_index" in st.secrets:
-    #         st.session_state.pinecone_index = st.secrets.pinecone_index
-    #     else:
-    #         st.session_state.pinecone_index = st.text_input("Pinecone index name")
-    #
-    # print("finish init")
-    # st.session_state.pinecone_db = st.toggle('Use Pinecone Vector DB')
 
-    # print("use pinecone: " +str(st.session_state.pinecone_db))
     #
     col1, col2 = st.columns(2)
 
-    # if hasattr(st.session_state, 'source_docs'):
-    #     print("docs are1: " + str(st.session_state.source_docs))
     with col1:
         st.session_state.source_docs = st.file_uploader(label="Load Documents", type="pdf", accept_multiple_files=True)
         st.button("Learn Documents", on_click=process_documents)
     with col2:
         st.session_state.links = st.file_uploader(label="Load webpages", type="properties", accept_multiple_files=False)
-        st.button("Submit links", on_click=process_links)
+        st.button("Learn links", on_click=process_links)
 
 
-    # init Chroma DB TODO do we need pinecone ?
     st.session_state.client = chromadb.PersistentClient(path=LOCAL_VECTOR_STORE_DIR.as_posix())
-    # if hasattr(st.session_state, 'source_docs'):
-    #     print("docs are1: " + str(st.session_state.source_docs))
-    #
+    st.session_state.text_splitter = RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=0)
 
 
 def process_links():
@@ -186,12 +175,6 @@ def process_links():
             #
             st.toast(f"Learning: " + title.strip().lstrip("b'").rstrip("'"))
             st.session_state.retriever = embeddings_on_local_vectordb(texts)
-            # if not st.session_state.pinecone_db:
-            #     st.toast(f"Learning: "+ title.strip().lstrip("b'").rstrip("'"))
-            #     st.session_state.retriever = embeddings_on_local_vectordb(texts)
-            # else:
-            #     st.info(f"storing in pinecone")
-                # st.session_state.retriever = embeddings_on_pinecone(texts)
         st.toast("Knowledge Base Updated")
     except Exception as e:
         print("error: " + str(e))
@@ -218,17 +201,8 @@ def prepare_doc(pdf_docs):
             "title": doc["title"]
         })
     return content, metadata
-def get_text_chunks(content, metadata):
-    text_splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
-        chunk_size=2000,
-        chunk_overlap=50,
-    )
-    split_docs = text_splitter.create_documents(content, metadatas=metadata)
-    print(f"Documents are split into {len(split_docs)} passages")
-    return split_docs
 
 def process_documents():
-    # if not st.session_state.openai_api_key or not st.session_state.pinecone_api_key or not st.session_state.pinecone_env or not st.session_state.pinecone_index or not st.session_state.source_docs:
     if not st.session_state.openai_api_key or not st.session_state.source_docs:
         st.warning(f"Please upload the documents and provide the missing fields.")
     else:
@@ -238,31 +212,6 @@ def process_documents():
             split_docs = get_text_chunks(content, metadata)
             st.session_state.retriever = embeddings_on_local_vectordb(split_docs)
             st.toast("Knowledge Base Updated")
-            # with st.spinner(text='In progress'):
-            #     time.sleep(1)
-            #     st.success('Knowledge Base Updated')
-            # if not st.session_state.pinecone_db:
-            #     st.session_state.retriever = embeddings_on_local_vectordb(split_docs)
-            # else:
-            #     st.info(f"storing in pinecone")
-                # st.session_state.retriever = embeddings_on_pinecone(texts)
-
-
-            # for content, metadata in content_metadata_list:
-            #     #
-            #     title = metadata.get("title")
-            #     #
-            #     print("load docs: " + title)
-            #     #
-            #     texts = get_text_chunks(content, metadata)
-            #     print("split_documents" + str(texts))
-            #     #
-            #     if not st.session_state.pinecone_db:
-            #         st.info(f"Learning: "+ title)
-            #         st.session_state.retriever = embeddings_on_local_vectordb(texts)
-            #     else:
-            #         st.info(f"storing in pinecone")
-            #         st.session_state.retriever = embeddings_on_pinecone(texts)
 
         except Exception as e:
             print("error: " + str(e))
@@ -288,14 +237,23 @@ def response_generator(response):
         yield word + " "
         time.sleep(0.05)
 
+def format_source_doc(source_docs):
+    source_docs_formatted = []
+    for doc in source_docs:
+        title = doc.metadata.get("title")
+        detail = doc.page_content
+        doc_formatted = {'title': title, 'detail': detail}
+        source_docs_formatted.append(doc_formatted)
+    return source_docs_formatted
+
 def boot():
     #
     print("BOOT")
-    st.image('./static/bis.png', width=100)
-    st.title("BIS ChatBot")
+    st.image('./static/bis.png', width=80)
+    st.header("BIS ChatBot", anchor=False, divider='gray')
     input_fields()
-    st.image('./static/genai.png', width=80)
-    st.subheader("How can I help you today?")
+    st.image('./static/genai.png', width=50)
+    st.subheader("How can I help you today?", anchor=False)
     #
     if "messages" not in st.session_state:
         st.session_state.messages = []
@@ -313,16 +271,19 @@ def boot():
             response_answer = response['answer']
             source_docs = response['source_documents']
         # is_valid_answer = validate_answer_against_sources(response_answer, source_docs)
-
+        source_docs_formatted =format_source_doc(response['source_documents'])
         col1, col2 = st.columns([3, 1])
         with col1:
             # st.chat_message("ai").write(response['answer'])
             st.chat_message("ai").write_stream(response_generator(response['answer']))
         with col2:
-            st.chat_message("code").write(response['source_documents'])
-        # if is_valid_answer:
-        #     with col2:
-        #         st.chat_message("code").write(response['source_documents'])
+            # st.chat_message("code").write(response['source_documents'])
+            with st.chat_message("source_documents"):
+                for doc in source_docs_formatted:
+                    st.markdown(doc['title'], help=doc['detail'])
+            # if is_valid_answer:
+            #     with col2:
+            #         st.chat_message("code").write(response['source_documents'])
 
 
 #TODO add validation of source ref

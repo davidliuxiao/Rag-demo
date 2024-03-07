@@ -3,6 +3,10 @@ div[data-testid="stSidebarContent"] {
 }
 
 
+div[data-testid="stHeadingDivider"] {
+    background-color: #aa322f;
+}
+
 div[data-testid="stImage"] {
     text-align: center;
     display: block;
