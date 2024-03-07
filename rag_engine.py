@@ -1,5 +1,4 @@
 import os
-import pinecone
 from pathlib import Path
 
 import PyPDF2
@@ -10,7 +9,7 @@ import chromadb
 from langchain.chat_models import ChatOpenAI
 from langchain.document_loaders import DirectoryLoader
 from langchain.text_splitter import CharacterTextSplitter
-from langchain.vectorstores import Chroma, Pinecone
+from langchain.vectorstores import Chroma
 from langchain.embeddings.openai import OpenAIEmbeddings
 
 
@@ -28,7 +27,7 @@ import time
 from langchain.document_loaders import SeleniumURLLoader
 
 #validate results
-from sentence_transformers import SentenceTransformer, util
+# from sentence_transformers import SentenceTransformer, util
 
 
 os.environ["LANGCHAIN_TRACING_V2"] = 'true'
