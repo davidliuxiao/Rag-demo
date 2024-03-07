@@ -6,9 +6,9 @@ import PyPDF2
 from langchain.chains import RetrievalQA, ConversationalRetrievalChain
 from langchain.embeddings import OpenAIEmbeddings
 
-__import__('pysqlite3')
+
 import sys
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+sys.modules['sqlite3'] = __import__('pysqlite3')
 
 import chromadb
 from langchain.chat_models import ChatOpenAI
