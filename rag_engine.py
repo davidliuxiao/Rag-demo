@@ -153,32 +153,38 @@ def input_fields():
         st.button("Learn Documents", on_click=process_documents)
     with col2:
         st.session_state.links = st.file_uploader(label="Load webpages", type="properties", accept_multiple_files=False)
-        st.button("Learn links", on_click=process_links)
+        st.button("Learn urls", on_click=process_links)
 
+
+
+def init_states():
 
     st.session_state.client = chromadb.PersistentClient(path=LOCAL_VECTOR_STORE_DIR.as_posix())
     st.session_state.text_splitter = RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=0)
 
+    st.session_state.links = {}
+    st.session_state.source_docs = {}
 
 def process_links():
-    if not st.session_state.openai_api_key or not st.session_state.source_docs:
-        st.warning(f"Please upload the documents and provide the missing fields.")
-    try:
-        properties = {}
-        for line in st.session_state.links:
-            #
-            print("start load links: ")
-            url, title = str(line).strip().split('|')
-            properties[url.strip()] = title.strip()
-            texts = split_links(url, title)
-            print("split_links" + str(texts))
-            #
-            st.toast(f"Learning: " + title.strip().lstrip("b'").rstrip("'"))
-            st.session_state.retriever = embeddings_on_local_vectordb(texts)
-        st.toast("Knowledge Base Updated")
-    except Exception as e:
-        print("error: " + str(e))
-        st.error(f"An error occurred: {e}")
+    if not st.session_state.openai_api_key or not st.session_state.links:
+        st.warning(f"Please upload the urls and provide the missing fields in the side-bar")
+    else:
+        try:
+            properties = {}
+            for line in st.session_state.links:
+                #
+                print("start load urls: ")
+                url, title = str(line).strip().split('|')
+                properties[url.strip()] = title.strip()
+                texts = split_links(url, title)
+                print("split_urls" + str(texts))
+                #
+                st.toast(f"Learning: " + title.strip().lstrip("b'").rstrip("'"))
+                st.session_state.retriever = embeddings_on_local_vectordb(texts)
+            st.toast("Knowledge Base Updated")
+        except Exception as e:
+            print("error: " + str(e))
+            st.error(f"An error occurred: {e}")
     return
 
 def prepare_doc(pdf_docs):
@@ -204,7 +210,7 @@ def prepare_doc(pdf_docs):
 
 def process_documents():
     if not st.session_state.openai_api_key or not st.session_state.source_docs:
-        st.warning(f"Please upload the documents and provide the missing fields.")
+        st.warning(f"Please upload the documents and provide the missing fields in the side-bar")
     else:
         try:
             print("start load docs: ")
@@ -251,6 +257,7 @@ def boot():
     print("BOOT")
     st.image('./static/bis.png', width=80)
     st.header("BIS ChatBot", anchor=False, divider='gray')
+    init_states()
     input_fields()
     st.image('./static/genai.png', width=50)
     st.subheader("How can I help you today?", anchor=False)
