@@ -1,12 +1,10 @@
 langchain
 langchain_openai
 langchain_core
-pinecone_client==2.2.2
 openai
 selenium
 unstructured
 unstructured[pdf]
-apify-client
 chromadb
 tiktoken
 playwright

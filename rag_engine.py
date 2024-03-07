@@ -115,17 +115,15 @@ def query_llm(retriever, query):
 
 def input_fields():
     print("start init")
-    st.session_state.openai_api_key = st.secrets.openai_api_key
-    #
     with st.sidebar:
         st.session_state.llm_model = st.selectbox('Model', ['gpt-3.5-turbo-0125','gpt-4-0125-preview'])
         st.container(height=100, border=False)
         st.button("Reset knowledge", on_click=clean_documents)
-    #     #
-    #     if "openai_api_key" in st.secrets:
-    #         st.session_state.openai_api_key = st.secrets.openai_api_key
-    #     else:
-    #         st.session_state.openai_api_key = st.text_input("OpenAI API key", type="password")
+        #
+        if "openai_api_key" in st.secrets:
+            st.session_state.openai_api_key = st.secrets.openai_api_key
+        else:
+            st.session_state.openai_api_key = st.text_input("OpenAI API key", type="password")
     #     #
     #     if "pinecone_api_key" in st.secrets:
     #         st.session_state.pinecone_api_key = st.secrets.pinecone_api_key
