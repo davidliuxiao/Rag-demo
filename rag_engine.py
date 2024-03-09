@@ -16,9 +16,12 @@ import chromadb
 from langchain.chat_models import ChatOpenAI
 from langchain.document_loaders import DirectoryLoader
 from langchain.text_splitter import CharacterTextSplitter
+
 from langchain.vectorstores import Chroma
 from langchain.embeddings.openai import OpenAIEmbeddings
 
+
+from langchain_text_splitters import HTMLHeaderTextSplitter
 
 from langchain_openai import ChatOpenAI
 
@@ -87,23 +90,44 @@ def get_text_chunks(content, metadata):
     return split_docs
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-def split_links(url, title):
+
+
+def split_links2(url):
     cleaned_url = url.strip("b'").strip('"')
     loader = SeleniumURLLoader(urls=[cleaned_url])
     documents = loader.load()
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=st.session_state.chunk_size, chunk_overlap=st.session_state.chunk_overlap)
     all_splits = text_splitter.split_documents(documents)
     return all_splits
+
+def split_links(url):
+    cleaned_url = url.strip("b'").strip('"')
+    headers_to_split_on = [
+        ("h1", "title"),
+        ("h3", "Content")
+    ]
+    html_splitter = HTMLHeaderTextSplitter(headers_to_split_on=headers_to_split_on)
+    html_header_splits = html_splitter.split_text_from_url(cleaned_url)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=st.session_state.chunk_size, chunk_overlap=st.session_state.chunk_overlap)
+    all_splits = text_splitter.split_documents(html_header_splits)
+    #Filter splits
+    filtered_splits = []
+    for split in all_splits:
+        if split.metadata.get('title') is not None and split.metadata.get('Content') is not None:
+            split.metadata['source'] = url
+            split.metadata['detail'] = split.page_content
+            filtered_splits.append(split)
+    return filtered_splits
+
 def embeddings_on_local_vectordb(texts):
     print("local")
-    embeddings = OpenAIEmbeddings(openai_api_key=st.session_state.openai_api_key)
-    vectordb = Chroma.from_documents(texts, embedding=embeddings, client=st.session_state.client,
+    vectordb = Chroma.from_documents(texts, embedding=st.session_state.embeddings, client=st.session_state.client,
                                      persist_directory=LOCAL_VECTOR_STORE_DIR.as_posix())
     vectordb.persist()
     retriever = vectordb.as_retriever()
     splitter = st.session_state.text_splitter
-    redundant_filter = EmbeddingsRedundantFilter(embeddings=embeddings)
-    relevant_filter = EmbeddingsFilter(embeddings=embeddings, similarity_threshold=st.session_state.docs_similarity)
+    redundant_filter = EmbeddingsRedundantFilter(embeddings=st.session_state.embeddings)
+    relevant_filter = EmbeddingsFilter(embeddings=st.session_state.embeddings, similarity_threshold=st.session_state.docs_similarity)
     pipeline_compressor = DocumentCompressorPipeline(
         transformers=[splitter, redundant_filter, relevant_filter]
     )
@@ -130,7 +154,7 @@ def query_llm(retriever, query):
 
 def input_fields():
     print("start init")
-    init_sidebar()
+
 
     col1, col2 = st.columns(2)
 
@@ -146,7 +170,7 @@ def init_sidebar():
     with st.sidebar:
         st.session_state.llm_model = st.selectbox('Model', ['gpt-3.5-turbo-0125', 'gpt-4-0125-preview'])
         st.container(height=100, border=False)
-        st.session_state.docs_similarity = st.slider("Documents Relevance", float(0.0), float(1.0), help='Relevance level for source inclusion')
+        st.session_state.docs_similarity = st.slider("Documents Relevance", float(0.0), float(1.0), float(0.72),help='Relevance level for source inclusion')
 
         st.container(height=100, border=False)
         st.session_state.chunk_size = 2000
@@ -167,7 +191,12 @@ def init_states():
     st.session_state.links = {}
     st.session_state.source_docs = {}
     st.session_state.client = chromadb.PersistentClient(path=LOCAL_VECTOR_STORE_DIR.as_posix())
-    # st.session_state.retriever = None
+
+    st.session_state.embeddings = OpenAIEmbeddings(openai_api_key=st.session_state.openai_api_key)
+
+    # st.session_state.retriever = Chroma(embedding_function=st.session_state.embeddings, client=st.session_state.client,
+    #                                  persist_directory=LOCAL_VECTOR_STORE_DIR.as_posix()).as_retriever()
+
 
 def process_links():
     if not st.session_state.openai_api_key or not st.session_state.links:
@@ -176,16 +205,16 @@ def process_links():
         try:
             st.session_state.text_splitter = RecursiveCharacterTextSplitter(chunk_size=st.session_state.chunk_size,
                                                                             chunk_overlap=st.session_state.chunk_overlap)
-            properties = {}
+            # properties = {}
             for line in st.session_state.links:
                 #
-                print("start load urls: ")
-                url, title = str(line).strip().split('|')
-                properties[url.strip()] = title.strip()
-                texts = split_links(url, title)
+                # url, title = str(line).strip().split('|')
+                # properties[url.strip()] = title.strip()
+                url = str(line).strip().lstrip("b'").strip("\\r\\n'")
+                texts = split_links(url)
                 print("split_urls" + str(texts))
                 #
-                st.toast(f"Learning: " + title.strip().lstrip("b'").rstrip("'"))
+                st.toast(f"Learning: " + url.strip().lstrip("b'").rstrip("'"))
                 st.session_state.retriever = embeddings_on_local_vectordb(texts)
             st.toast("Knowledge Base Updated")
         except Exception as e:
@@ -284,6 +313,7 @@ def boot():
     print("BOOT")
     st.image('./static/bis.png', width=80)
     st.header("BIS ChatBot", anchor=False, divider='gray')
+    init_sidebar()
     init_states()
     input_fields()
     st.image('./static/genai.png', width=50)
@@ -317,12 +347,11 @@ def boot():
                 with st.chat_message("source_documents"):
                     for doc in source_docs_formatted:
                         title = doc['title']
-                        url = doc['source']
+                        url = doc['source'].strip("b'").strip('"')
                         link = f'[{title}]({url})'
                         st.markdown(link, help=doc['detail'])
 
-
-
+#TODO  upload pdf to blob and return url for source ref
 
 if __name__ == '__main__':
     #
