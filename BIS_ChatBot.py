@@ -121,6 +121,7 @@ def split_links(url):
 
 def embeddings_on_local_vectordb(texts):
     print("local")
+    st.session_state.embeddings = OpenAIEmbeddings(openai_api_key=st.session_state.openai_api_key)
     vectordb = Chroma.from_documents(texts, embedding=st.session_state.embeddings, client=st.session_state.client,
                                      persist_directory=LOCAL_VECTOR_STORE_DIR.as_posix())
     vectordb.persist()
@@ -192,8 +193,6 @@ def init_states():
     st.session_state.source_docs = {}
     st.session_state.client = chromadb.PersistentClient(path=LOCAL_VECTOR_STORE_DIR.as_posix())
 
-    st.session_state.embeddings = OpenAIEmbeddings(openai_api_key=st.session_state.openai_api_key)
-
     # st.session_state.retriever = Chroma(embedding_function=st.session_state.embeddings, client=st.session_state.client,
     #                                  persist_directory=LOCAL_VECTOR_STORE_DIR.as_posix()).as_retriever()
 
@@ -262,7 +261,7 @@ def process_documents():
             st.session_state.text_splitter = RecursiveCharacterTextSplitter(chunk_size=st.session_state.chunk_size,
                                                                             chunk_overlap=st.session_state.chunk_overlap)
             print("start load docs: ")
-            save_pdf(st.session_state.source_docs)
+            # save_pdf(st.session_state.source_docs)
             content, metadata = prepare_doc(st.session_state.source_docs)
             split_docs = get_text_chunks(content, metadata)
             st.session_state.retriever = embeddings_on_local_vectordb(split_docs)
