@@ -33,7 +33,7 @@ from streamlit_js_eval import streamlit_js_eval
 import time
 
 #SeleniumURLLoader
-from langchain.document_loaders import SeleniumURLLoader
+# from langchain.document_loaders import SeleniumURLLoader
 
 
 from langchain.retrievers import ContextualCompressionRetriever
@@ -92,13 +92,13 @@ def get_text_chunks(content, metadata):
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 
-def split_links2(url):
-    cleaned_url = url.strip("b'").strip('"')
-    loader = SeleniumURLLoader(urls=[cleaned_url])
-    documents = loader.load()
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=st.session_state.chunk_size, chunk_overlap=st.session_state.chunk_overlap)
-    all_splits = text_splitter.split_documents(documents)
-    return all_splits
+# def split_links2(url):
+#     cleaned_url = url.strip("b'").strip('"')
+#     loader = SeleniumURLLoader(urls=[cleaned_url])
+#     documents = loader.load()
+#     text_splitter = RecursiveCharacterTextSplitter(chunk_size=st.session_state.chunk_size, chunk_overlap=st.session_state.chunk_overlap)
+#     all_splits = text_splitter.split_documents(documents)
+#     return all_splits
 
 def split_links(url):
     cleaned_url = url.strip("b'").strip('"')
