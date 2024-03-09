@@ -8,8 +8,8 @@ from langchain.embeddings import OpenAIEmbeddings
 
 #TODO uncomment before deploying, to overcome streamlit bug
 import sys
-sys.modules['sqlite3'] = __import__('pysqlite3')
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+# sys.modules['sqlite3'] = __import__('pysqlite3')
+# sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 
 import chromadb
@@ -31,16 +31,14 @@ from streamlit_js_eval import streamlit_js_eval
 
 
 import time
-
-#SeleniumURLLoader
-# from langchain.document_loaders import SeleniumURLLoader
+import base64
 
 
 from langchain.retrievers import ContextualCompressionRetriever
-from langchain.retrievers.document_compressors import LLMChainExtractor
 from langchain.retrievers.document_compressors import DocumentCompressorPipeline
 from langchain_community.document_transformers import EmbeddingsRedundantFilter
 from langchain.retrievers.document_compressors import EmbeddingsFilter
+
 
 
 os.environ["LANGCHAIN_TRACING_V2"] = 'true'
@@ -56,12 +54,22 @@ st.set_page_config(page_title="BIS ChatBot")
 with open("./static/style.css") as f:
     st.markdown('<style>{}</style>'.format(f.read()), unsafe_allow_html=True)
 
-PDF_DIR = Path(__file__).resolve().parent.joinpath('data', 'pdfs')
+PDF_DIR = Path(__file__).resolve().parent.joinpath('static','data', 'pdfs')
+STATIC_DIR = Path(__file__).resolve().parent.joinpath('static')
 
 def load_documents():
     loader = DirectoryLoader(PDF_DIR.as_posix(), glob='**/*.pdf')
     documents = loader.load()
     return documents
+
+
+def delete_files(path):
+    for filename in os.listdir(path):
+        if os.path.isfile(os.path.join(path, filename)):
+            os.remove(os.path.join(path, filename))
+            print("File removed :" + os.path.join(path, filename))
+
+
 
 def clean_documents():
     # shutil.rmtree(LOCAL_VECTOR_STORE_DIR.as_posix())
@@ -75,6 +83,9 @@ def clean_documents():
     st.session_state.source_docs = None
     # TODO delete all pdfs
     streamlit_js_eval(js_expressions="parent.window.location.reload()")
+
+    # Clean pdfs uploaded
+    delete_files(PDF_DIR.as_posix())
     return
 
 def split_documents(documents):
@@ -170,21 +181,35 @@ def input_fields():
 def init_sidebar():
     with st.sidebar:
         st.session_state.llm_model = st.selectbox('Model', ['gpt-3.5-turbo-0125', 'gpt-4-0125-preview'])
-        st.container(height=100, border=False)
+        st.container(height=30, border=False)
         st.session_state.docs_similarity = st.slider("Documents Relevance", float(0.0), float(1.0), float(0.72),help='Relevance level for source inclusion')
 
-        st.container(height=100, border=False)
+        st.container(height=30, border=False)
         st.session_state.chunk_size = 2000
         st.session_state.chunk_size = st.slider("Chunk Size", 100, 100000, 2000, help='Unit of information provide to context')
         st.session_state.chunk_overlap = 50
         st.session_state.chunk_overlap = st.slider("Chunk Size", 0, 2000, 100, help='Unit of information provide to context')
-        st.container(height=100, border=False)
+        st.container(height=80, border=False)
         st.button("Reset knowledge", on_click=clean_documents)
         #
         if "openai_api_key" in st.secrets:
             st.session_state.openai_api_key = st.secrets.openai_api_key
         else:
             st.session_state.openai_api_key = st.text_input("OpenAI API key", type="password")
+
+        st.container(height=50, border=False)
+        url = "https://smith.langchain.com/"
+        title = "MLOps Monitoring"
+        # link = f'[{title}]({url})'
+        # st.markdown("[![MLOps](app/static/mlops.png)](https://smith.langchain.com/)")
+        st.markdown(
+            """<a href="https://smith.langchain.com/">
+            <img src="app/static/mlops.png" width="50">
+            </a>
+            """
+            ,
+            unsafe_allow_html=True,
+        )
 
 
 def init_states():
@@ -207,8 +232,6 @@ def process_links():
             # properties = {}
             for line in st.session_state.links:
                 #
-                # url, title = str(line).strip().split('|')
-                # properties[url.strip()] = title.strip()
                 url = str(line).strip().lstrip("b'").strip("\\r\\n'")
                 texts = split_links(url)
                 print("split_urls" + str(texts))
@@ -261,7 +284,7 @@ def process_documents():
             st.session_state.text_splitter = RecursiveCharacterTextSplitter(chunk_size=st.session_state.chunk_size,
                                                                             chunk_overlap=st.session_state.chunk_overlap)
             print("start load docs: ")
-            # save_pdf(st.session_state.source_docs)
+            save_pdf(st.session_state.source_docs)
             content, metadata = prepare_doc(st.session_state.source_docs)
             split_docs = get_text_chunks(content, metadata)
             st.session_state.retriever = embeddings_on_local_vectordb(split_docs)
@@ -296,9 +319,11 @@ def format_source_doc(source_docs):
     for doc in source_docs:
         if doc.metadata.get("page") is not None and int(doc.metadata.get("page")) > 0:
             title =  doc.metadata.get("title") + ' page '+doc.metadata.get("page")
-            source = os.path.join(PDF_DIR.as_posix(), doc.metadata.get("title"))
+            source = '/app/static/' + doc.metadata.get("title")
+
             detail = doc.page_content
             doc_formatted = {'title': title,'source': source, 'detail': detail}
+            # doc_formatted = {'title': title,'source': pdf_display, 'detail': detail}
         else:
             title =  doc.metadata.get("title")
             source = doc.metadata.get("source")
