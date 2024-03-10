@@ -1,4 +1,4 @@
-FROM python:3.9-slim AS builder
+FROM python:3.9-slim AS streamlit
 
 WORKDIR /app
 
@@ -10,14 +10,11 @@ RUN git clone https://github.com/davidliuxiao/Rag-demo.git .
 
 RUN pip3 install -r requirements.txt
 
+
+EXPOSE 80
 EXPOSE 8501
 
 HEALTHCHECK CMD curl --fail http://localhost:8501/_stcore/health
 
 ENTRYPOINT ["streamlit", "run", "BIS_ChatBot.py", "--server.port=8501", "--server.address=0.0.0.0"]
 
-# use Nginx to serve static files
-FROM nginx:alpine
-RUN mkdir -p /usr/share/nginx/html/pdf
-COPY --from=builder /app/static/data/pdfs /usr/share/nginx/html/pdfs
-EXPOSE 80
