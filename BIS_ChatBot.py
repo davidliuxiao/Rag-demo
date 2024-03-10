@@ -54,7 +54,12 @@ st.set_page_config(page_title="BIS ChatBot")
 with open("./static/style.css") as f:
     st.markdown('<style>{}</style>'.format(f.read()), unsafe_allow_html=True)
 
-PDF_DIR = Path(__file__).resolve().parent.joinpath('static','data', 'pdfs')
+# PDF_DIR = Path(__file__).resolve().parent.joinpath('static','data', 'pdfs')
+
+# Create a directory to save uploaded files
+PDF_DIR = Path('/').joinpath('usr', 'share', 'nginx', 'data', 'pdfs')
+PDF_DIR.mkdir(parents=True, exist_ok=True)
+
 STATIC_DIR = Path(__file__).resolve().parent.joinpath('static')
 
 def load_documents():
@@ -319,7 +324,8 @@ def format_source_doc(source_docs):
     for doc in source_docs:
         if doc.metadata.get("page") is not None and int(doc.metadata.get("page")) > 0:
             title =  doc.metadata.get("title") + ' page '+doc.metadata.get("page")
-            source = '/app/static/' + doc.metadata.get("title")
+            #pdf link
+            source = 'http://localhost/pdfs/' + doc.metadata.get("title")
 
             detail = doc.page_content
             doc_formatted = {'title': title,'source': source, 'detail': detail}
