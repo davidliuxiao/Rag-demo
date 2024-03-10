@@ -1,4 +1,4 @@
-FROM python:3.9-slim AS streamlit
+FROM python:3.9-slim
 
 WORKDIR /app
 
@@ -10,7 +10,8 @@ RUN git clone https://github.com/davidliuxiao/Rag-demo.git .
 
 RUN pip3 install -r requirements.txt
 
-RUN python -m http.server 80
+#RUN python -m http.server 80
+RUN python -m http.server 80 &
 
 EXPOSE 80
 EXPOSE 8501
@@ -18,4 +19,3 @@ EXPOSE 8501
 HEALTHCHECK CMD curl --fail http://localhost:8501/_stcore/health
 
 ENTRYPOINT ["streamlit", "run", "BIS_ChatBot.py", "--server.port=8501", "--server.address=0.0.0.0"]
-

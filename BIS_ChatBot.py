@@ -325,7 +325,7 @@ def format_source_doc(source_docs):
         if doc.metadata.get("page") is not None and int(doc.metadata.get("page")) > 0:
             title =  doc.metadata.get("title") + ' page '+doc.metadata.get("page")
             #pdf link
-            source = 'http://localhost/data/pdfs/' + doc.metadata.get("title")
+            source = 'http://localhost/app/data/pdfs/' + doc.metadata.get("title")
 
             detail = doc.page_content
             doc_formatted = {'title': title,'source': source, 'detail': detail}
