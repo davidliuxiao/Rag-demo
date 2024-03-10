@@ -195,9 +195,10 @@ def init_sidebar():
 
         st.container(height=30, border=False)
         st.session_state.chunk_size = 2000
-        st.session_state.chunk_size = st.slider("Chunk Size", 100, 100000, 2000, help='Unit of information provide to context')
-        st.session_state.chunk_overlap = 50
-        st.session_state.chunk_overlap = st.slider("Chunk Size", 0, 2000, 100, help='Unit of information provide to context')
+        st.session_state.chunk_size = st.slider("Chunk Size", 100, 100000, 30000, help='Unit of information provide to context')
+        # st.session_state.chunk_overlap = 50
+        # st.session_state.chunk_overlap = st.slider("Chunk Overlap", 0, 2000, 100, help='Unit of information provide to context')
+        st.session_state.chunk_overlap = 100
         st.container(height=80, border=False)
         st.button("Reset knowledge", on_click=clean_documents)
         #
@@ -209,8 +210,6 @@ def init_sidebar():
         st.container(height=50, border=False)
         url = "https://smith.langchain.com/"
         title = "MLOps Monitoring"
-        # link = f'[{title}]({url})'
-        # st.markdown("[![MLOps](app/static/mlops.png)](https://smith.langchain.com/)")
         st.markdown(
             """<a href="https://smith.langchain.com/">
             <img src="app/static/mlops.png" width="50">
@@ -387,7 +386,6 @@ def boot():
                         link = f'[{title}]({url})'
                         st.markdown(link, help='relevance:' + str(doc['relevance']) + '  ' +doc['detail'])
 
-#TODO  upload pdf to blob and return url for source ref
 
 if __name__ == '__main__':
     #
