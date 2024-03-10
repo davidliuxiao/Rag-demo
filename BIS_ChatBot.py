@@ -141,22 +141,26 @@ def embeddings_on_local_vectordb(texts):
     vectordb = Chroma.from_documents(texts, embedding=st.session_state.embeddings, client=st.session_state.client,
                                      persist_directory=LOCAL_VECTOR_STORE_DIR.as_posix())
     vectordb.persist()
-    retriever = vectordb.as_retriever()
+    st.session_state.retriever = vectordb.as_retriever()
+    return get_retriever()
+
+
+def get_retriever():
     splitter = st.session_state.text_splitter
     redundant_filter = EmbeddingsRedundantFilter(embeddings=st.session_state.embeddings)
-    relevant_filter = EmbeddingsFilter(embeddings=st.session_state.embeddings, similarity_threshold=st.session_state.docs_similarity)
+    relevant_filter = EmbeddingsFilter(embeddings=st.session_state.embeddings,
+                                       similarity_threshold=st.session_state.docs_similarity)
     pipeline_compressor = DocumentCompressorPipeline(
         transformers=[splitter, redundant_filter, relevant_filter]
     )
     compression_retriever = ContextualCompressionRetriever(
-        base_compressor=pipeline_compressor, base_retriever=retriever
+        base_compressor=pipeline_compressor, base_retriever=st.session_state.retriever
     )
-
     return compression_retriever
 
 
-def query_llm(retriever, query):
-
+def query_llm(query):
+    retriever = get_retriever()
     qa_chain = ConversationalRetrievalChain.from_llm(
         llm=ChatOpenAI(model_name=st.session_state.llm_model, openai_api_key=st.session_state.openai_api_key),
         # condense_question_prompt = PROMPT,
@@ -328,13 +332,15 @@ def format_source_doc(source_docs):
             source = 'http://localhost/app/data/pdfs/' + doc.metadata.get("title")
 
             detail = doc.page_content
-            doc_formatted = {'title': title,'source': source, 'detail': detail}
+            similarity_score = doc.state['query_similarity_score']
+            doc_formatted = {'title': title,'source': source, 'detail': detail, 'relevance': similarity_score}
             # doc_formatted = {'title': title,'source': pdf_display, 'detail': detail}
         else:
             title =  doc.metadata.get("title")
             source = doc.metadata.get("source")
             detail = doc.page_content
-            doc_formatted = {'title': title,'source': source, 'detail': detail}
+            similarity_score = doc.state['query_similarity_score']
+            doc_formatted = {'title': title,'source': source, 'detail': detail, 'relevance': similarity_score}
         source_docs_formatted.append(doc_formatted)
     return source_docs_formatted
 
@@ -361,7 +367,7 @@ def boot():
         if "retriever" not in st.session_state:
             st.warning("Please upload the documents or urls first")
         else:
-            response = query_llm(st.session_state.retriever, query)
+            response = query_llm(query)
 
             # Post-processing step to validate the answer against the source documents
             if response['source_documents']:
@@ -379,7 +385,7 @@ def boot():
                         title = doc['title']
                         url = doc['source'].strip("b'").strip('"')
                         link = f'[{title}]({url})'
-                        st.markdown(link, help=doc['detail'])
+                        st.markdown(link, help='relevance:' + str(doc['relevance']) + '  ' +doc['detail'])
 
 #TODO  upload pdf to blob and return url for source ref
 
