@@ -199,13 +199,16 @@ def init_sidebar():
         # st.session_state.chunk_overlap = 50
         # st.session_state.chunk_overlap = st.slider("Chunk Overlap", 0, 2000, 100, help='Unit of information provide to context')
         st.session_state.chunk_overlap = 100
-        st.container(height=80, border=False)
-        st.button("Reset knowledge", on_click=clean_documents)
+
         #
         if "openai_api_key" in st.secrets:
             st.session_state.openai_api_key = st.secrets.openai_api_key
         else:
             st.session_state.openai_api_key = st.text_input("OpenAI API key", type="password")
+
+        if "retriever" in st.session_state:
+            st.container(height=80, border=False)
+            st.button("Reset knowledge", on_click=clean_documents)
 
         st.container(height=50, border=False)
         url = "https://smith.langchain.com/"
