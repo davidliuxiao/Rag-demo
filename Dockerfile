@@ -10,6 +10,7 @@ RUN git clone https://github.com/davidliuxiao/Rag-demo.git .
 
 RUN pip3 install -r requirements.txt
 
+RUN python -m http.server 80
 
 EXPOSE 80
 EXPOSE 8501
