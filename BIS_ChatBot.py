@@ -49,7 +49,7 @@ LOCAL_VECTOR_STORE_DIR = Path(__file__).resolve().parent.joinpath('data', 'vecto
 
 
 
-st.set_page_config(page_title="BIS ChatBot")
+st.set_page_config(page_title="BIS ChatBot", page_icon='./static/genai_red.png', layout="wide")
 
 with open("./static/style.css") as f:
     st.markdown('<style>{}</style>'.format(f.read()), unsafe_allow_html=True)
@@ -323,7 +323,7 @@ def validate_answer_against_sources(response_answer, source_documents):
 def response_generator(response):
     for word in response.split():
         yield word + " "
-        time.sleep(0.05)
+        time.sleep(0.03)
 
 def format_source_doc(source_docs):
     source_docs_formatted = []
