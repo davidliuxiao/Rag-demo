@@ -39,7 +39,7 @@ from langchain.retrievers.document_compressors import DocumentCompressorPipeline
 from langchain_community.document_transformers import EmbeddingsRedundantFilter
 from langchain.retrievers.document_compressors import EmbeddingsFilter
 
-import socket
+
 
 os.environ["LANGCHAIN_TRACING_V2"] = 'true'
 os.environ["LANGCHAIN_API_KEY"] = 'ls__3c556b0468344b198cc40b30da61f447'
@@ -331,9 +331,8 @@ def format_source_doc(source_docs):
         if doc.metadata.get("page") is not None and int(doc.metadata.get("page")) > 0:
             title =  doc.metadata.get("title") + ' page '+doc.metadata.get("page")
             #pdf link
-            container_hostname = socket.gethostname()
-            container_fqdn = socket.getfqdn(container_hostname)
-            source = 'http://' + container_fqdn + '/data/pdfs/' + doc.metadata.get("title")
+            container_fqdn = os.getenv('WEBSITE_HOSTNAME') or ''
+            source = container_fqdn + '/data/pdfs/' + doc.metadata.get("title")
 
             detail = doc.page_content
             similarity_score = doc.state['query_similarity_score']
