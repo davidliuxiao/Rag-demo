@@ -332,7 +332,7 @@ def format_source_doc(source_docs):
             title =  doc.metadata.get("title") + ' page '+doc.metadata.get("page")
             #pdf link
             container_fqdn = os.getenv('WEBSITE_HOSTNAME') or ''
-            source = container_fqdn + '/data/pdfs/' + doc.metadata.get("title")
+            source = 'http://' + container_fqdn + '/data/pdfs/' + doc.metadata.get("title")
 
             detail = doc.page_content
             similarity_score = doc.state['query_similarity_score']
