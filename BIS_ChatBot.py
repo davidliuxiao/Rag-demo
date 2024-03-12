@@ -192,13 +192,12 @@ def init_sidebar():
         st.session_state.llm_model = st.selectbox('Model', ['gpt-3.5-turbo-0125', 'gpt-4-0125-preview'])
         st.container(height=30, border=False)
         st.session_state.docs_similarity = st.slider("Documents Relevance", float(0.0), float(1.0), float(0.72),help='Relevance level for source inclusion')
-
         st.container(height=30, border=False)
-        st.session_state.chunk_size = 2000
-        st.session_state.chunk_size = st.slider("Chunk Size", 100, 100000, 30000, help='Unit of information provide to context')
-        # st.session_state.chunk_overlap = 50
-        # st.session_state.chunk_overlap = st.slider("Chunk Overlap", 0, 2000, 100, help='Unit of information provide to context')
-        st.session_state.chunk_overlap = 100
+        with st.expander("Chunking parameters"):
+            st.session_state.chunk_size = 2000
+            st.session_state.chunk_size = st.slider("Chunk Size", 100, 100000, 30000, help='Amount of  information is grouped together')
+            st.session_state.chunk_overlap = st.slider("Chunk Overlap", 0, 2000, 100, help='Amount of shared information between the chunks')
+            st.session_state.chunk_overlap = 100
 
         #
         if "openai_api_key" in st.secrets:
@@ -331,7 +330,7 @@ def format_source_doc(source_docs):
         if doc.metadata.get("page") is not None and int(doc.metadata.get("page")) > 0:
             title =  doc.metadata.get("title") + ' page '+doc.metadata.get("page")
             #pdf link
-            container_fqdn = os.getenv('WEBSITE_HOSTNAME') or ''
+            container_fqdn = os.getenv('WEBSITE_HOSTNAME') or 'localhost'
             source = 'http://' + container_fqdn + '/data/pdfs/' + doc.metadata.get("title")
 
             detail = doc.page_content
