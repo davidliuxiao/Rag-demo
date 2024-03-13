@@ -31,15 +31,17 @@ from streamlit_js_eval import streamlit_js_eval
 
 
 import time
+from datetime import datetime
 import base64
-
+import requests
+from bs4 import BeautifulSoup
 
 from langchain.retrievers import ContextualCompressionRetriever
 from langchain.retrievers.document_compressors import DocumentCompressorPipeline
 from langchain_community.document_transformers import EmbeddingsRedundantFilter
 from langchain.retrievers.document_compressors import EmbeddingsFilter
 
-
+from urllib.parse import quote
 
 os.environ["LANGCHAIN_TRACING_V2"] = 'true'
 os.environ["LANGCHAIN_API_KEY"] = 'ls__3c556b0468344b198cc40b30da61f447'
@@ -132,8 +134,28 @@ def split_links(url):
         if split.metadata.get('title') is not None and split.metadata.get('Content') is not None:
             split.metadata['source'] = url
             split.metadata['detail'] = split.page_content
+            split = enhance_meta(cleaned_url, split)
             filtered_splits.append(split)
     return filtered_splits
+
+#This method is BIS bulltins specific
+def enhance_meta(url, split):
+    response = requests.get(url)
+
+    html_content = response.text
+    soup = BeautifulSoup(html_content, 'html.parser')
+
+    # Find the first <meta content element
+    citation_author_elements = soup.find_all('meta', {'name': 'citation_author'})
+    citation_authors = [meta['content'] for meta in citation_author_elements]
+
+    citation_publication_date_elements = soup.find_all('meta', {'name': ['citation_publication_date']})
+    citation_publication_date = [meta['content'] for meta in citation_publication_date_elements]
+    split.metadata['authors'] = ', '.join(citation_authors)
+    split.metadata['pub_date'] = citation_publication_date[0]
+    return split
+
+
 
 def embeddings_on_local_vectordb(texts):
     print("local")
@@ -255,9 +277,9 @@ def process_links():
                 #
                 url = str(line).strip().lstrip("b'").strip("\\r\\n'")
                 texts = split_links(url)
-                print("split_urls" + str(texts))
+                # print("split_urls" + str(texts))
                 #
-                st.toast(f"Learning: " + url.strip().lstrip("b'").rstrip("'"))
+                st.toast(f"Learning Url: " + url.strip().lstrip("b'").rstrip("'"))
                 st.session_state.retriever = embeddings_on_local_vectordb(texts)
             st.toast("Knowledge Base Updated")
         except Exception as e:
@@ -271,23 +293,42 @@ def prepare_doc(pdf_docs):
     content = []
     # content_metadata_list = []
     for pdf in pdf_docs:
-        print(pdf.name)
+
         pdf_reader = PyPDF2.PdfReader(pdf)
+        if pdf_reader.metadata.title is not None:
+            pdf_name = str(pdf_reader.metadata.title)
+        else:
+            pdf_name = pdf.name
         for index, text in enumerate(pdf_reader.pages):
-            doc_page = {'title': pdf.name,
+            doc_page = {'title': pdf_name,
+                        'source' : pdf.name,
                         'page' : str(index + 1),
-                        'content': pdf_reader.pages[index].extract_text()}
+                        'content': pdf_reader.pages[index].extract_text(),
+                        'authors': pdf_reader.metadata.author_raw or '',
+                        'pub_date' : convert_datetime_to_str(pdf_reader.metadata.modification_date)
+                        }
             docs.append(doc_page)
     for doc in docs:
-        st.toast(f"Learning: " + doc["title"] + ': page '+ doc["page"])
+        st.toast(f"Learning pdf: " + doc["title"] + ': page '+ doc["page"])
         # content_metadata_list.append((doc["content"], {"title": doc["title"]}))
         content.append(doc["content"])
-        metadata.append({
+        page_meta = {
             "title": doc["title"],
+            "source": doc["source"],
             "page": doc["page"],
+            "authors": doc["authors"],
+            "pub_date": doc["pub_date"],
             "type" :"pdf"
-        })
+        }
+        metadata.append(page_meta)
+
     return content, metadata
+
+def convert_datetime_to_str(dt):
+    if dt is not None and isinstance(dt, datetime):
+        return dt.strftime('%Y-%m-%d %H:%M:%S')  # Adjust the format as needed
+    else:
+        return ''
 
 
 def save_pdf(source_docs):
@@ -341,18 +382,21 @@ def format_source_doc(source_docs):
             title =  doc.metadata.get("title") + ' page '+doc.metadata.get("page")
             #pdf link
             container_fqdn = os.getenv('WEBSITE_HOSTNAME') or 'localhost'
-            source = 'http://' + container_fqdn + '/data/pdfs/' + doc.metadata.get("title")
-
+            source = 'http://' + container_fqdn + '/data/pdfs/' + doc.metadata.get("source")
+            authors = doc.metadata.get("authors") or 'Unknown'
+            pub_date = doc.metadata.get("pub_date") or ''
             detail = doc.page_content
             similarity_score = doc.state['query_similarity_score']
-            doc_formatted = {'title': title,'source': source, 'detail': detail, 'relevance': similarity_score}
+            doc_formatted = {'title': title,'source': source, 'detail': detail, 'pub_date': pub_date,'authors': authors, 'relevance': similarity_score}
             # doc_formatted = {'title': title,'source': pdf_display, 'detail': detail}
         else:
             title =  doc.metadata.get("title")
             source = doc.metadata.get("source")
+            authors = doc.metadata.get("authors") or 'Unknown'
+            pub_date = doc.metadata.get("pub_date") or ''
             detail = doc.page_content
             similarity_score = doc.state['query_similarity_score']
-            doc_formatted = {'title': title,'source': source, 'detail': detail, 'relevance': similarity_score}
+            doc_formatted = {'title': title,'source': source, 'detail': detail, 'pub_date': pub_date,'authors': authors, 'relevance': similarity_score}
         source_docs_formatted.append(doc_formatted)
     return source_docs_formatted
 
@@ -396,8 +440,12 @@ def boot():
                     for doc in source_docs_formatted:
                         title = doc['title']
                         url = doc['source'].strip("b'").strip('"')
+                        url = quote(url, safe=':/')
                         link = f'[{title}]({url})'
-                        st.markdown(link, help='relevance:' + str(doc['relevance']) + '  ' +doc['detail'])
+                        st.markdown(link, help='Authors:' + str(doc['authors']) + ' || ' +
+                                               'Pub_date:' + str(doc['pub_date']) + '  || ' +
+                                               'Relevance:' + str(doc['relevance']) + '  ||  ' +
+                                               'Content:' + doc['detail'])
 
 
 if __name__ == '__main__':
