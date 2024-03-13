@@ -13,8 +13,6 @@ RUN pip3 install -r requirements.txt
 #COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x entrypoint.sh
 
-#RUN python -m http.server 80
-
 
 EXPOSE 80
 EXPOSE 8501

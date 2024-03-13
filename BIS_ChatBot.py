@@ -141,9 +141,16 @@ def embeddings_on_local_vectordb(texts):
     vectordb = Chroma.from_documents(texts, embedding=st.session_state.embeddings, client=st.session_state.client,
                                      persist_directory=LOCAL_VECTOR_STORE_DIR.as_posix())
     vectordb.persist()
-    st.session_state.retriever = vectordb.as_retriever()
+    st.session_state.retriever = vectordb.as_retriever(search_kwargs={'k': 5})
     return get_retriever()
 
+
+def init_on_local_vectordb():
+    st.session_state.embeddings = OpenAIEmbeddings(openai_api_key=st.session_state.openai_api_key)
+    vectordb = Chroma(embedding_function=st.session_state.embeddings, client=st.session_state.client,
+                                     persist_directory=LOCAL_VECTOR_STORE_DIR.as_posix())
+    st.session_state.retriever = vectordb.as_retriever(search_kwargs={'k': 5})
+    return get_retriever()
 
 def get_retriever():
     splitter = st.session_state.text_splitter
@@ -226,7 +233,11 @@ def init_states():
 
     st.session_state.links = {}
     st.session_state.source_docs = {}
+    st.session_state.text_splitter = RecursiveCharacterTextSplitter(chunk_size=st.session_state.chunk_size,
+                                                                    chunk_overlap=st.session_state.chunk_overlap)
     st.session_state.client = chromadb.PersistentClient(path=LOCAL_VECTOR_STORE_DIR.as_posix())
+    st.session_state.retriever = init_on_local_vectordb()
+
 
     # st.session_state.retriever = Chroma(embedding_function=st.session_state.embeddings, client=st.session_state.client,
     #                                  persist_directory=LOCAL_VECTOR_STORE_DIR.as_posix()).as_retriever()
@@ -291,8 +302,7 @@ def process_documents():
         st.warning(f"Please upload the documents and provide the missing fields in the side-bar")
     else:
         try:
-            st.session_state.text_splitter = RecursiveCharacterTextSplitter(chunk_size=st.session_state.chunk_size,
-                                                                            chunk_overlap=st.session_state.chunk_overlap)
+
             print("start load docs: ")
             save_pdf(st.session_state.source_docs)
             content, metadata = prepare_doc(st.session_state.source_docs)
